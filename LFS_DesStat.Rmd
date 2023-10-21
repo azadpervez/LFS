@@ -1,0 +1,102 @@
+---
+title: "Insights into Canada's Evolving Labor Force"
+GitHub: "https://github.com/azadpervez/LFS.git"
+author: "Md Azad Pervez"
+Course: "CIND 820 Big Data Analytics Project"
+output: word_document
+---
+
+# Define the file path
+```{r}
+full_dataset_path <- "C:/820WF/LFS_2017_2023/lfs_17_23.csv"
+# Read the CSV file
+LFS_data <- read.csv(full_dataset_path)
+```
+
+
+#Summary of Data
+```{r}
+summary(LFS_data)
+```
+#Detailed statistics 
+```{r}
+#install.packages("psych")
+
+library(psych)
+
+# Compute detailed statistics for the entire dataset
+detailed_statistics <- describe(LFS_data)
+
+# View the detailed statistics
+print(detailed_statistics)
+```
+
+#Section 2: Bar plot of observations per year
+```{r}
+observation_count <- table(LFS_data$SURVYEAR)
+observation_df <- as.data.frame(observation_count)
+observation_df$year <- row.names(observation_df)
+colnames(observation_df) <- c("Year", "Observations")
+
+# Convert the "Observations" column to thousands
+observation_df$Observations <- observation_df$Observations / 1000
+
+# Set a larger margin for the right axis label
+par(mar = c(5, 6, 4, 6))
+
+# Create the barplot
+barplot(observation_df$Observations, names.arg = observation_df$Year, col = "steelblue",
+        xlab = "Year", ylab = "Number of Observations (in thousands)",
+        main = "Number of Observations by Year",
+        las = 1, horiz = FALSE)
+
+
+```
+#Correlation Table
+```{r}
+correlation_matrix <- cor(LFS_data)
+
+# Create a correlation table
+correlation_table <- as.data.frame(correlation_matrix)
+
+# Print the correlation table
+print(correlation_table)
+
+```
+
+#Section 3: Correlation Visuals
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(reshape2)
+
+# Create a correlation matrix
+correlation_matrix <- cor(LFS_data)
+
+# Clean the correlation matrix by replacing NAs with zeros
+correlation_matrix[is.na(correlation_matrix)] <- 0
+
+# Ensure that all values are finite (replace Inf with a large value)
+correlation_matrix[!is.finite(correlation_matrix)] <- 1e-10
+
+# Calculate hierarchical clustering order
+order <- hclust(as.dist(1 - correlation_matrix))$order
+
+# Reorder the correlation matrix and create a long format
+correlation_reordered <- correlation_matrix[order, order]
+correlation_long <- melt(correlation_reordered)
+
+# Create a ggplot2-style correlation matrix plot
+ggplot(data = correlation_long, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "black", high = "red", mid = "white", midpoint = 0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_fixed()
+
+
+# Create a heat map-style correlation matrix plot
+heatmap(correlation_matrix, col = colorRampPalette(c("blue", "white", "red"))(50), 
+        main = "Correlation Heatmap", xlab = "Variables", ylab = "Variables")
+```
+
