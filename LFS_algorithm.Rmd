@@ -1,6 +1,5 @@
 ---
 title: "LFS_Algorithms"
-author: "Azad"
 date: "2023-11-05"
 output: word_document
 ---
