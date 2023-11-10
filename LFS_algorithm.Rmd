@@ -1,0 +1,202 @@
+---
+title: "LFS_Algorithms"
+author: "Azad"
+date: "2023-11-05"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+# Define the file path and Read CSV
+```{r}
+full_dataset_path <- "C:/820WF/LFS_2017_2023/lfs_17_23.csv"
+LFS_data <- read.csv(full_dataset_path)
+```
+
+# Select a smaller subset of data from 2021
+```{r}
+# Select only the rows where SURVYEAR is greater than or equal to 2021
+LFS_Selected_2021_onwards <- LFS_data[LFS_data$SURVYEAR >= 2021, c("LFSSTAT", "PROV", "AGE_12", "SEX", "MARSTAT", "EDUC", "IMMIG")]
+```
+
+
+#Dependent and Independent Variables
+```{r}
+##Dependent Variable: LFSSTAT
+
+# LFSSTAT (Labour force status) contains the following:
+#1	Employed, at work
+#2	Employed, absent from work
+#3	Unemployed
+#4	Not in labour force
+
+#For the purpose of data analysis the dependent variable is combined into two levels
+# 1 = 1 = Active Employment
+# 2 = 2,3,4 = Inactive employment
+
+## Independent variables: Six variables taken as independent variables:
+
+# prov =	Province
+# age_12 =	Five-year age group of respondent
+# sex	= Sex of respondent
+# marstat =	Marital status of respondent
+# educ =	Highest educational attainment
+# immig =	Immigrant status
+
+
+#Algorithms
+
+# The algorithms that are used are Decision Tree, Random Forest and Naive Bayes
+# Cross-validation is used to assess the performance of the models
+# Accuracy, Precision and Recalls are used to see how the models performed
+
+```
+
+# Load the Libraries
+```{r}
+library(randomForest)
+library(caret)
+library(rpart)
+library(e1071)
+
+# Combine the four LFSSTAT categories into two levels
+LFS_Selected_2021_onwards$LFSSTAT <- ifelse(LFS_Selected_2021_onwards$LFSSTAT == 1, 1, 2)
+
+```
+
+
+# Algorithm 1: Decision Tree
+```{r}
+# Prepare the Data
+LFS_Selected_2021_onwards$LFSSTAT <- as.factor(LFS_Selected_2021_onwards$LFSSTAT)
+
+# cross-validation settings
+control_ndt <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+
+# Create a smaller training subset
+set.seed(123)
+
+sample_size <- floor(0.1 * nrow(LFS_Selected_2021_onwards))  # Use 10% of the data
+train_index_ndt <- sample(1:nrow(LFS_Selected_2021_onwards), sample_size)
+smaller_training_data_ndt <- LFS_Selected_2021_onwards[train_index_ndt, ]
+testing_data_ndt <- LFS_Selected_2021_onwards[-train_index_ndt, ]
+
+# Train a Decision Tree Model with cross-validation
+tree_model_ndt <- train(LFSSTAT ~ ., data = smaller_training_data_ndt, method = "rpart", trControl = control_ndt)
+
+# Make Predictions with class labels
+tree_predictions_class <- predict(tree_model_ndt, testing_data_ndt)
+
+# confusion matrix
+confusion_tree <- confusionMatrix(tree_predictions_class, testing_data_ndt$LFSSTAT)
+
+# Accuracy, precision and recall
+accuracy_tree <- confusion_tree$overall['Accuracy']
+precision_tree <- confusion_tree$byClass['Pos Pred Value']
+recall_tree <- confusion_tree$byClass['Sensitivity']
+
+# Print the confusion matrix and results
+print(confusion_tree)
+cat("Accuracy:", accuracy_tree, "\n")
+cat("Precision:", precision_tree, "\n")
+cat("Recall:", recall_tree, "\n")
+```
+
+# Algorithm 2: Random Forest
+```{r}
+# Split the dataset into a training set and a test set
+set.seed(123)
+trainIndex <- createDataPartition(LFS_Selected_2021_onwards$LFSSTAT, p = 0.7, list = FALSE)
+
+# the data set is large so the dataset is shrinked into a smaller one
+smaller_training_data <- LFS_Selected_2021_onwards[sample(nrow(LFS_Selected_2021_onwards), nrow(LFS_Selected_2021_onwards) / 10), ]
+
+# the testing data
+testing_data <- LFS_Selected_2021_onwards[-trainIndex, ]
+
+# cross-validation
+control_rf <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+
+# Train the Random Forest model using cross-validation
+model_rf <- train(factor(LFSSTAT) ~ ., data = smaller_training_data, method = "rf", trControl = control_rf, ntree = 25)
+
+# Make predictions using the model
+predictions_rf <- predict(model_rf, testing_data)
+
+# Ensure both are factors with the same levels
+predictions_rf <- as.factor(predictions_rf)
+testing_data$LFSSTAT <- as.factor(testing_data$LFSSTAT)
+
+# Confusion matrix
+confusion_rf <- confusionMatrix(predictions_rf, testing_data$LFSSTAT)
+
+# Calculate accuracy, precision, and recall
+accuracy_rf <- confusion_rf$overall['Accuracy']
+precision_rf <- confusion_rf$byClass['Pos Pred Value']
+recall_rf <- confusion_rf$byClass['Sensitivity']
+
+# Print the confusion matrix and results
+print(confusion_rf)
+cat("Accuracy:", accuracy_rf, "\n")
+cat("Precision:", precision_rf, "\n")
+cat("Recall:", recall_rf, "\n")
+```
+
+## Algorithm 3: Naive Bayes
+```{r}
+LFS_Selected_2021_onwards$LFSSTAT <- as.factor(LFS_Selected_2021_onwards$LFSSTAT)
+
+# cross-validation
+control_nb <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+
+# Create a smaller training subset
+set.seed(123)
+sample_size <- floor(0.1 * nrow(LFS_Selected_2021_onwards))  # Use 10% of the data
+train_index_nb <- sample(1:nrow(LFS_Selected_2021_onwards), sample_size)
+smaller_training_data_nb <- LFS_Selected_2021_onwards[train_index_nb, ]
+testing_data_nb <- LFS_Selected_2021_onwards[-train_index_nb, ]
+
+# Train a Naive Bayes Model with cross-validation
+nb_model <- train(LFSSTAT ~ ., data = smaller_training_data_nb, method = "naive_bayes", trControl = control_nb)
+
+# Make Predictions
+nb_predictions <- predict(nb_model, testing_data_nb)
+
+# confusion matrix
+confusion_nb <- confusionMatrix(nb_predictions, testing_data_nb$LFSSTAT)
+
+# Calculate accuracy, precision, and recall
+accuracy_nb <- confusion_nb$overall['Accuracy']
+precision_nb <- confusion_nb$byClass['Pos Pred Value']
+recall_nb <- confusion_nb$byClass['Sensitivity']
+
+# Print the confusion matrix and results
+print(confusion_nb)
+
+cat("Accuracy:", accuracy_nb, "\n")
+cat("Precision:", precision_nb, "\n")
+cat("Recall:", recall_nb, "\n")
+```
+# Comparing Models Performance:
+```{r}
+# To determine which model is the better predictor out of the three Accuracy, Precision, and Recall were calculated for all the models. Here is the breakdown of the performance:
+# 
+# Decision Tree:
+# Accuracy: 0.7372695 
+# Precision: 0.704979 
+# Recall: 0.8641425 
+# 
+# Random Forest:
+# Accuracy: 0.7518439 
+# Precision: 0.7258791 
+# Recall: 0.8516241 
+# 
+# Naive Bayes:
+# Accuracy: 0.7419847 
+# Precision: 0.7103227 
+# Recall: 0.8636474 
+# 
+# Based on the Accuracy, Precision, and Recall, the Random Forest model appears to be the best predictor among the three models. Since, Random Forest has highest accuracy (0.7518439) which indicates that it correctly classifies a higher percentage of data points compared to the other models. Random Forest also has the highest precision (0.7258791), which means that when it predicts the positive class, it is more likely to be correct, resulting in fewer false positives. While the Decision Tree has slightly higher recall (0.8641425) than Random Forest (0.8516241) and Naive Bayes (0.8636474), the difference is not significant. Recall measures the ability of the model to identify all positive instances correctly.
+```
