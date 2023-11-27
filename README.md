@@ -21,3 +21,15 @@ Content of this Repository:
 - LFS_datacompile.R: Combine monthly LFS .csv from 2017-2023 (Sep) files into one .csv
 - LFS_algorithm.docs: Algorithm Modeling R Markdown file
 - LFS_algorithm.Rmd: Algorithm Modeling 
+
+CSV Files:
+- pub0123.csv : January 2023 LFS Data
+- pub0223.csv : February 2023 LFS Data
+- pub0323.csv : March 2023 LFS Data
+- pub0423.csv : April 2023 LFS Data
+- pub0523.csv : May 2023 LFS Data
+- pub0623.csv : June 2023 LFS Data
+- pub0723.csv : July 2023 LFS Data
+- pub0823.csv : August 2023 LFS Data
+- pub0923.csv : September 2023 LFS Data
+- pub1023.csv : October 2023 LFS Data
