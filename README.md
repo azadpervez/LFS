@@ -17,7 +17,7 @@ Stages of the Project:
 Content of this Repository:
 - Readme: readme file listing the tentative stages of the project and outlining the content of this repository
 - LFS_DesStat.Rmd: Descriptive Statistics
-- LFS_Descriptive_Stat.docx: Descriptive Statistics R Markdown File
+- LFS_DesStat.docx: Descriptive Statistics R Markdown File
 - LFS_datacompile.R: Combine monthly LFS .csv from 2017-2023 (Sep) files into one .csv
-- LFS_algorithm.html: R Markdown HTML file of Initial Analysis
-- LFS_algorithm.Rmd: Predictive Model of initial analysis
+- LFS_algorithm.docs: Algorithm Modeling R Markdown file
+- LFS_algorithm.Rmd: Algorithm Modeling 
