@@ -3,9 +3,9 @@ title: "LFS_Algorithms"
 author: "Azad"
 date: "2023-11-05"
 output:
+  word_document: default
   html_document:
     df_print: paged
-  word_document: default
   pdf_document: default
 ---
 
@@ -15,10 +15,11 @@ full_dataset_path <- "C:/820WF/LFS_2017_2023/lfs_17_23.csv"
 LFS_data <- read.csv(full_dataset_path)
 ```
 
-# Select a smaller subset of data from 2021
+# Select a smaller subset of data and Combine Categories
 ```{r}
-# Select only the rows where SURVYEAR is greater than or equal to 2021
-LFS_Selected_2021_onwards <- LFS_data[LFS_data$SURVYEAR >= 2021, c("LFSSTAT", "PROV", "AGE_12", "SEX", "MARSTAT", "EDUC", "IMMIG")]
+# Select only the relevant variables
+LFS_Selected <- LFS_data[LFS_data$SURVYEAR >= 2023, c("LFSSTAT", "PROV", "AGE_12", "SEX", "MARSTAT", "EDUC", "IMMIG")]
+
 ```
 
 
@@ -54,23 +55,25 @@ LFS_Selected_2021_onwards <- LFS_data[LFS_data$SURVYEAR >= 2021, c("LFSSTAT", "P
 
 ```
 
+
+# Combine the four LFSSTAT categories into two levels
+```{r}
+LFS_Selected$LFSSTAT <- ifelse(LFS_Selected$LFSSTAT == 1, 1, 2)
+```
+
+
 # Load the Libraries
 ```{r}
 library(randomForest)
 library(caret)
 library(rpart)
 library(e1071)
-
-# Combine the four LFSSTAT categories into two levels
-LFS_Selected_2021_onwards$LFSSTAT <- ifelse(LFS_Selected_2021_onwards$LFSSTAT == 1, 1, 2)
-
 ```
-
 
 # Algorithm 1: Decision Tree
 ```{r}
 # Prepare the Data
-LFS_Selected_2021_onwards$LFSSTAT <- as.factor(LFS_Selected_2021_onwards$LFSSTAT)
+LFS_Selected$LFSSTAT <- as.factor(LFS_Selected$LFSSTAT)
 
 # cross-validation settings
 control_ndt <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
@@ -78,10 +81,10 @@ control_ndt <- trainControl(method = "cv", number = 5)  # 5-fold cross-validatio
 # Create a smaller training subset
 set.seed(123)
 
-sample_size <- floor(0.1 * nrow(LFS_Selected_2021_onwards))  # Use 10% of the data
-train_index_ndt <- sample(1:nrow(LFS_Selected_2021_onwards), sample_size)
-smaller_training_data_ndt <- LFS_Selected_2021_onwards[train_index_ndt, ]
-testing_data_ndt <- LFS_Selected_2021_onwards[-train_index_ndt, ]
+sample_size <- floor(0.1 * nrow(LFS_Selected))  # Use 10% of the data
+train_index_ndt <- sample(1:nrow(LFS_Selected), sample_size)
+smaller_training_data_ndt <- LFS_Selected[train_index_ndt, ]
+testing_data_ndt <- LFS_Selected[-train_index_ndt, ]
 
 # Train a Decision Tree Model with cross-validation
 tree_model_ndt <- train(LFSSTAT ~ ., data = smaller_training_data_ndt, method = "rpart", trControl = control_ndt)
@@ -103,21 +106,49 @@ cat("Accuracy:", accuracy_tree, "\n")
 cat("Precision:", precision_tree, "\n")
 cat("Recall:", recall_tree, "\n")
 ```
+#Visualize Decision Tree Confusion Matrix
+```{r}
+# Convert the confusion matrix to a data frame for plotting
+conf_matrix_tree_df <- as.data.frame(as.table(confusion_tree))
+
+# Calculate percentages for a more informative plot
+conf_matrix_tree_df$Percentage <- conf_matrix_tree_df$Freq / sum(conf_matrix_tree_df$Freq) * 100
+
+# Plot the confusion matrix using ggplot2
+conf_plot_dt <- ggplot(conf_matrix_tree_df, aes(x = Reference, y = Prediction, fill = Percentage)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", Percentage)), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "skyblue") +  # Adjust the color scale
+  theme_minimal() +
+  labs(title = "Confusion Matrix - Decision Tree",
+       x = "Actual",
+       y = "Predicted") +
+  theme(axis.text = element_text(size = 12),       # Adjust text size
+        axis.title = element_text(size = 14),      # Adjust axis title size
+        plot.title = element_text(size = 16))      # Adjust plot title size
+
+# Display the plot
+print(conf_plot_dt)
+
+
+```
+
+
 
 # Algorithm 2: Random Forest
 ```{r}
 # Split the dataset into a training set and a test set
 set.seed(123)
-trainIndex <- createDataPartition(LFS_Selected_2021_onwards$LFSSTAT, p = 0.7, list = FALSE)
+trainIndex <- createDataPartition(LFS_Selected$LFSSTAT, p = 0.7, list = FALSE)
 
 # the data set is large so the dataset is shrinked into a smaller one
-smaller_training_data <- LFS_Selected_2021_onwards[sample(nrow(LFS_Selected_2021_onwards), nrow(LFS_Selected_2021_onwards) / 10), ]
+smaller_training_data <- LFS_Selected[sample(nrow(LFS_Selected), nrow(LFS_Selected) / 10), ]
 
 # the testing data
-testing_data <- LFS_Selected_2021_onwards[-trainIndex, ]
+testing_data <- LFS_Selected[-trainIndex, ]
 
 # cross-validation
-control_rf <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+control_rf <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
 
 # Train the Random Forest model using cross-validation
 model_rf <- train(factor(LFSSTAT) ~ ., data = smaller_training_data, method = "rf", trControl = control_rf, ntree = 25)
@@ -143,20 +174,47 @@ cat("Accuracy:", accuracy_rf, "\n")
 cat("Precision:", precision_rf, "\n")
 cat("Recall:", recall_rf, "\n")
 ```
+#Visualize Random Forest Confusion Matrix
+```{r}
+# Convert the confusion matrix to a data frame for plotting
+conf_matrix_rf_df <- as.data.frame(as.table(confusion_rf))
+
+# Calculate percentages for a more informative plot
+conf_matrix_rf_df$Percentage <- conf_matrix_rf_df$Freq / sum(conf_matrix_rf_df$Freq) * 100
+
+# Plot the confusion matrix using ggplot2
+conf_plot_rf <- ggplot(conf_matrix_rf_df, aes(x = Reference, y = Prediction, fill = Percentage)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", Percentage)), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "skyblue") +  # Adjust the color scale
+  theme_minimal() +
+  labs(title = "Confusion Matrix - Random Forest",
+       x = "Actual",
+       y = "Predicted") +
+  theme(axis.text = element_text(size = 12),       # Adjust text size
+        axis.title = element_text(size = 14),      # Adjust axis title size
+        plot.title = element_text(size = 16))      # Adjust plot title size
+
+# Display the plot
+print(conf_plot_rf)
+
+
+```
+
 
 ## Algorithm 3: Naive Bayes
 ```{r}
-LFS_Selected_2021_onwards$LFSSTAT <- as.factor(LFS_Selected_2021_onwards$LFSSTAT)
+LFS_Selected$LFSSTAT <- as.factor(LFS_Selected$LFSSTAT)
 
 # cross-validation
 control_nb <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
 
 # Create a smaller training subset
 set.seed(123)
-sample_size <- floor(0.1 * nrow(LFS_Selected_2021_onwards))  # Use 10% of the data
-train_index_nb <- sample(1:nrow(LFS_Selected_2021_onwards), sample_size)
-smaller_training_data_nb <- LFS_Selected_2021_onwards[train_index_nb, ]
-testing_data_nb <- LFS_Selected_2021_onwards[-train_index_nb, ]
+sample_size <- floor(0.1 * nrow(LFS_Selected))  # Use 10% of the data
+train_index_nb <- sample(1:nrow(LFS_Selected), sample_size)
+smaller_training_data_nb <- LFS_Selected[train_index_nb, ]
+testing_data_nb <- LFS_Selected[-train_index_nb, ]
 
 # Train a Naive Bayes Model with cross-validation
 nb_model <- train(LFSSTAT ~ ., data = smaller_training_data_nb, method = "naive_bayes", trControl = control_nb)
@@ -179,24 +237,97 @@ cat("Accuracy:", accuracy_nb, "\n")
 cat("Precision:", precision_nb, "\n")
 cat("Recall:", recall_nb, "\n")
 ```
-# Comparing Models Performance:
+#Visualize Naive Bayes Confusion Matrix
 ```{r}
-# To determine which model is the better predictor out of the three Accuracy, Precision, and Recall were calculated for all the models. Here is the breakdown of the performance:
-# 
-# Decision Tree:
-# Accuracy: 0.7372695 
-# Precision: 0.704979 
-# Recall: 0.8641425 
-# 
-# Random Forest:
-# Accuracy: 0.7518439 
-# Precision: 0.7258791 
-# Recall: 0.8516241 
-# 
-# Naive Bayes:
-# Accuracy: 0.7419847 
-# Precision: 0.7103227 
-# Recall: 0.8636474 
-# 
-# Based on the Accuracy, Precision, and Recall, the Random Forest model appears to be the best predictor among the three models. Since, Random Forest has highest accuracy (0.7518439) which indicates that it correctly classifies a higher percentage of data points compared to the other models. Random Forest also has the highest precision (0.7258791), which means that when it predicts the positive class, it is more likely to be correct, resulting in fewer false positives. While the Decision Tree has slightly higher recall (0.8641425) than Random Forest (0.8516241) and Naive Bayes (0.8636474), the difference is not significant. Recall measures the ability of the model to identify all positive instances correctly.
+# Convert the confusion matrix to a data frame for plotting
+conf_matrix_nb_df <- as.data.frame(as.table(confusion_nb))
+
+# Calculate percentages for a more informative plot
+conf_matrix_nb_df$Percentage <- conf_matrix_nb_df$Freq / sum(conf_matrix_nb_df$Freq) * 100
+
+# Plot the confusion matrix using ggplot2
+conf_plot_nb <- ggplot(conf_matrix_nb_df, aes(x = Reference, y = Prediction, fill = Percentage)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", Percentage)), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "skyblue") +  # Adjust the color scale
+  theme_minimal() +
+  labs(title = "Confusion Matrix - Naive Bayes",
+       x = "Actual",
+       y = "Predicted") +
+  theme(axis.text = element_text(size = 12),       # Adjust text size
+        axis.title = element_text(size = 14),      # Adjust axis title size
+        plot.title = element_text(size = 16))      # Adjust plot title size
+
+# Display the plot
+print(conf_plot_nb)
+
+
+```
+
+
+# LFS Oct: Read October 2023 Dataset
+```{r}
+Oct_dataset_path <- "C:/820WF/LFS_2017_2023/lfs_1023.csv"
+Oct_data <- read.csv(Oct_dataset_path)
+```
+
+# LFS Oct: Select a smaller subset of data and Combine Categories
+```{r}
+# Select only the relevant variables
+Oct_Selected <- Oct_data[c("SURVYEAR","LFSSTAT", "PROV", "AGE_12", "SEX", "MARSTAT", "EDUC", "IMMIG")]
+
+# Combine the four LFSSTAT categories into two levels
+Oct_Selected$LFSSTAT <- ifelse(Oct_Selected$LFSSTAT == 1, 1, 2)
+```
+
+# LFS Oct: Predictions on Oct Data
+```{r}
+# Make predictions using the model
+predictions_rf_Oct <- predict(model_rf, Oct_Selected)
+
+# Ensure both are factors with the same levels
+predictions_rf_Oct <- as.factor(predictions_rf_Oct)
+Oct_Selected$LFSSTAT <- as.factor(Oct_Selected$LFSSTAT)
+
+# Confusion matrix
+confusion_rf_Oct <- confusionMatrix(predictions_rf_Oct, Oct_Selected$LFSSTAT)
+
+# Calculate accuracy, precision, and recall
+accuracy_rf_Oct <- confusion_rf_Oct$overall['Accuracy']
+precision_rf_Oct <- confusion_rf_Oct$byClass['Pos Pred Value']
+recall_rf_Oct <- confusion_rf_Oct$byClass['Sensitivity']
+
+# Print the confusion matrix and results
+print(confusion_rf_Oct)
+cat("Accuracy:", accuracy_rf_Oct, "\n")
+cat("Precision:", precision_rf_Oct, "\n")
+cat("Recall:", recall_rf_Oct, "\n")
+
+```
+
+#Visualize Random Forest Confusion Matrix - Oct
+```{r}
+# Convert the confusion matrix to a data frame for plotting
+conf_matrix_rf_Oct_df <- as.data.frame(as.table(confusion_rf_Oct))
+
+# Calculate percentages for a more informative plot
+conf_matrix_rf_Oct_df$Percentage <- conf_matrix_rf_Oct_df$Freq / sum(conf_matrix_rf_Oct_df$Freq) * 100
+
+# Plot the confusion matrix using ggplot2
+conf_plot_rf_Oct <- ggplot(conf_matrix_rf_Oct_df, aes(x = Reference, y = Prediction, fill = Percentage)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", Percentage)), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "skyblue") +  # Adjust the color scale
+  theme_minimal() +
+  labs(title = "Confusion Matrix - Random Forest",
+       x = "Actual",
+       y = "Predicted") +
+  theme(axis.text = element_text(size = 12),       # Adjust text size
+        axis.title = element_text(size = 14),      # Adjust axis title size
+        plot.title = element_text(size = 16))      # Adjust plot title size
+
+# Display the plot
+print(conf_plot_rf_Oct)
+
+
 ```
